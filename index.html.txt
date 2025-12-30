@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامانه لجستیک هوشمند</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @font-face { font-family: 'B Nazanin'; src: local('B Nazanin'); }
+        :root { --main: #1b5e20; --gold: #c5a059; --danger: #e11d48; --bg: #f8fafc; }
+        
+        body { font-family: 'B Nazanin', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 0; font-size: 18px; color: #1e293b; }
+
+        /* لودینگ */
+        #splash { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 3000; transition: 0.5s; }
+        
+        /* استایل صفحات */
+        .page { display: none; padding: 20px; animation: fadeIn 0.4s; }
+        .active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* منوی اصلی مدرن */
+        .menu-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 30px; }
+        .menu-item { background: white; padding: 25px; border-radius: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; cursor: pointer; transition: 0.3s; }
+        .menu-item:active { transform: scale(0.95); background: var(--main); color: white; }
+
+        /* کارت‌ها و فرم‌ها */
+        .card { background: white; padding: 20px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid white; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid #cbd5e1; font-family: 'B Nazanin'; font-size: 17px; box-sizing: border-box; }
+        
+        /* استایل انتخاب روزهای هفته */
+        .weekday-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+        .day-btn { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; cursor: pointer; background: #f1f5f9; }
+        .day-btn.selected { background: var(--main); color: white; border-color: var(--main); }
+
+        .btn-main { background: var(--main); color: white; border: none; width: 100%; padding: 15px; border-radius: 14px; font-weight: bold; font-size: 19px; font-family: 'B Nazanin'; margin-top: 15px; cursor: pointer; box-shadow: 0 5px 15px rgba(27, 94, 32, 0.3); }
+        
+        /* لیست اقلام */
+        .item-card { background: white; padding: 15px; border-radius: 18px; margin-bottom: 12px; border-right: 6px solid var(--gold); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+        .badge { font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+        .expired { background: #fee2e2; color: #dc2626; }
+    </style>
+</head>
+<body>
+
+<div id="splash">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Police_of_Iran_Emblem.svg/1200px-Police_of_Iran_Emblem.svg.png" width="120" alt="ناجا">
+    <h2 style="color: var(--main); margin-top: 15px;">سامانه مدیریت هوشمند جیره</h2>
+    <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top-color: var(--main); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+</div>
+
+<div id="menu-page" class="page active">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: var(--main); margin-bottom: 5px;">پنل کاربری انبار</h2>
+        <p style="font-size: 14px; color: #64748b;">مدیریت دقیق بر اساس برنامه هفتگی</p>
+    </div>
+    <div class="menu-grid">
+        <div class="menu-item" onclick="navigate('edit-page')">📝 <b>ثبت و ویرایش جیره</b></div>
+        <div class="menu-item" onclick="navigate('view-page')">📋 <b>مشاهده موجودی و برنامه</b></div>
+    </div>
+</div>
+
+<div id="edit-page" class="page">
+    <button onclick="navigate('menu-page')" style="background:none; border:none; color:var(--main); font-weight:bold; cursor:pointer;">⬅ بازگشت به منو</button>
+    <div class="card" style="margin-top:15px;">
+        <h3 id="form-title">ثبت محصول و برنامه مصرف</h3>
+        <input type="hidden" id="edit-idx">
+        <input type="text" id="name" placeholder="نام کالا (مثلاً: گوشت منجمد)">
+        <input type="text" id="entry-date" placeholder="تاریخ ورود (۱۴۰۴/۱۰/۰۷)">
+        <input type="text" id="exp-date" placeholder="تاریخ انقضا (۱۴۰۵/۰۱/۰۱)">
+        <input type="number" id="total-qty" placeholder="موجودی اولیه (کیلو/عدد)">
+        <input type="number" id="daily-usage" placeholder="مقدار مصرف در هر وعده">
+        
+        <label style="font-size: 14px; color: #64748b;">روزهای مصرف در هفته:</label>
+        <div class="weekday-picker" id="days-picker">
+            <div class="day-btn" onclick="toggleDay(this, 0)">شنبه</div>
+            <div class="day-btn" onclick="toggleDay(this, 1)">۱شنبه</div>
+            <div class="day-btn" onclick="toggleDay(this, 2)">۲شنبه</div>
+            <div class="day-btn" onclick="toggleDay(this, 3)">۳شنبه</div>
+            <div class="day-btn" onclick="toggleDay(this, 4)">۴شنبه</div>
+            <div class="day-btn" onclick="toggleDay(this, 5)">۵شنبه</div>
+            <div class="day-btn" onclick="toggleDay(this, 6)">جمعه</div>
+        </div>
+
+        <button class="btn-main" id="save-btn" onclick="saveItem()">💾 ذخیره در سامانه</button>
+    </div>
+</div>
+
+<div id="view-page" class="page">
+    <button onclick="navigate('menu-page')" style="background:none; border:none; color:var(--main); font-weight:bold; cursor:pointer;">⬅ بازگشت</button>
+    <div class="card" style="margin-top:15px;">
+        <input type="text" id="search" placeholder="🔍 جستجوی کالا..." onkeyup="renderItems()">
+        <div id="list-container"></div>
+        <button class="btn-main" style="background:#16a34a" onclick="exportExcel()">📥 دانلود فایل اکسل</button>
+    </div>
+</div>
+
+<script>
+    let inventory = JSON.parse(localStorage.getItem('smart_police_db')) || [];
+    let selectedDays = [];
+
+    // لودینگ
+    window.onload = () => { setTimeout(() => { document.getElementById('splash').style.display='none'; }, 3000); };
+
+    function navigate(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'view-page') renderItems();
+        if(id === 'edit-page') resetForm();
+    }
+
+    function toggleDay(btn, dayIdx) {
+        btn.classList.toggle('selected');
+        if(selectedDays.includes(dayIdx)) {
+            selectedDays = selectedDays.filter(d => d !== dayIdx);
+        } else {
+            selectedDays.push(dayIdx);
+        }
+    }
+
+    function saveItem() {
+        const name = document.getElementById('name').value;
+        const total = parseFloat(document.getElementById('total-qty').value);
+        const usage = parseFloat(document.getElementById('daily-usage').value);
+        const entry = document.getElementById('entry-date').value;
+        const exp = document.getElementById('exp-date').value;
+
+        if(!name || isNaN(total) || selectedDays.length === 0) {
+            alert("نام، موجودی و حداقل یک روز مصرف را انتخاب کنید");
+            return;
+        }
+
+        // محاسبه مصرف ماهانه: (تعداد روزهای انتخابی در هفته * مصرف هر وعده * ۴ هفته)
+        const monthlyUsage = selectedDays.length * usage * 4;
+        const item = { 
+            name, total, usage, entry, exp, 
+            days: [...selectedDays], 
+            rem: total - monthlyUsage 
+        };
+
+        const editIdx = document.getElementById('edit-idx').value;
+        if(editIdx !== "") inventory[editIdx] = item;
+        else inventory.unshift(item);
+
+        localStorage.setItem('smart_police_db', JSON.stringify(inventory));
+        alert("اطلاعات با موفقیت ثبت شد");
+        navigate('menu-page');
+    }
+
+    function renderItems() {
+        const container = document.getElementById('list-container');
+        container.innerHTML = '';
+        inventory.forEach((item, i) => {
+            const isLow = item.rem < 0;
+            const daysNames = ["ش", "۱ش", "۲ش", "۳ش", "۴ش", "۵ش", "ج"];
+            const myDays = item.days.map(d => daysNames[d]).join("، ");
+
+            container.innerHTML += `
+                <div class="item-card">
+                    <div style="flex:1">
+                        <div style="font-weight:bold; font-size:19px">${item.name}</div>
+                        <div style="font-size:13px; color:#64748b">برنامه: ${myDays} | انقضا: ${item.exp || '---'}</div>
+                        <div style="font-size:14px; margin-top:5px">مانده نهایی: <b style="color:${isLow?'red':'green'}">${item.rem}</b></div>
+                    </div>
+                    <div style="text-align:left">
+                        <button onclick="editItem(${i})" style="border:none; background:#f1f5f9; padding:5px 10px; border-radius:5px; font-family:'B Nazanin'">ویرایش</button>
+                        <button onclick="deleteItem(${i})" style="border:none; background:#fee2e2; color:red; padding:5px 10px; border-radius:5px; margin-top:5px">حذف</button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function editItem(i) {
+        const item = inventory[i];
+        navigate('edit-page');
+        document.getElementById('name').value = item.name;
+        document.getElementById('entry-date').value = item.entry;
+        document.getElementById('exp-date').value = item.exp;
+        document.getElementById('total-qty').value = item.total;
+        document.getElementById('daily-usage').value = item.usage;
+        document.getElementById('edit-idx').value = i;
+        document.getElementById('form-title').innerText = "ویرایش محصول";
+        
+        // بازنشانی روزها
+        selectedDays = [...item.days];
+        const buttons = document.querySelectorAll('.day-btn');
+        buttons.forEach((btn, idx) => {
+            if(selectedDays.includes(idx)) btn.classList.add('selected');
+            else btn.classList.remove('selected');
+        });
+    }
+
+    function deleteItem(i) { if(confirm("حذف شود؟")) { inventory.splice(i,1); localStorage.setItem('smart_police_db', JSON.stringify(inventory)); renderItems(); } }
+
+    function resetForm() {
+        document.querySelectorAll('input').forEach(inp => inp.value='');
+        document.getElementById('edit-idx').value = "";
+        document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
+        selectedDays = [];
+    }
+
+    function exportExcel() {
+        const ws = XLSX.utils.json_to_sheet(inventory);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+        XLSX.writeFile(wb, "Gozaresh_Naja.xlsx");
+    }
+</script>
+
+<style> @keyframes spin { 100% { transform: rotate(360deg); } } </style>
+</body>
+</html>
